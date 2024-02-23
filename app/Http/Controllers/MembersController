@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Membre;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class MembersController extends Controller
+{
+    public function index(Request $request)
+    {
+       
+        $query = Membre::query();
+        $searchTexts = $request->searchText;
+        if ($searchTexts) {
+            $searchTexts = explode(' ', $searchTexts);
+            foreach ($searchTexts as $searchText) {
+                if ($searchText) {
+                    $query->where(function ($query) use ($searchText) {
+                        foreach (['name', 'provider_name', 'provider_name'] as $col) {
+                            $query->orWhere(
+                                $col, 'like', '%'.$searchText.'%'
+                            );
+                        }
+                    });
+                }
+            }
+        }
+        if (null !== $request->quantity) {
+            $query->where('quantity', '>', $request->quantity);
+        }
+
+        return view('membres.index', [
+            'membres' => $query->paginate(15),
+        ]);
+    }
+
+    public function create()
+    {
+        return view('membres.create');
+    }
+
+    public function store(Request $request)
+    {
+        $inputs = $request->validate([
+            'name' =>          'required|min:10|max:128|regex:/[a-zA-Z0-9\s]+/',
+            'provider_name' =>  'required|min:2|max:60',
+            'provider-pw' => 'requires|min:8|max:60',
+            'provider_email' => 'nullable|email|max:128',
+        ]);
+
+        $membre = new Membre();
+        $membre->user_id = 1;
+        $membre->name = $inputs['name'];
+        $membre->provider_name = $inputs['provider_name'];
+        $membre->provider_pw = $inputs['provider_pw'];
+        $membre->provider_email = $inputs['provider_email'] ?? null;
+
+        try {
+            $membre->save();
+        } catch (\Exception $e) {
+            report($e);
+            return back()->withErrors('Erreur lors de la sauvegarde du membres');
+        }
+
+        return back();
+    }
+
+    public function delete(int $id)
+    {
+        Membre::destroy($id);
+
+        return back()->with('message', trans('Membre supprimer'));
+    }
+}
